@@ -158,11 +158,15 @@ public class MainMenuManager : MonoBehaviour
         foreach (var player in session.Players)
         {
             GameObject listItem = Instantiate(playerListItemPrefab, playerListContainer);
-            TextMeshProUGUI textComponent = listItem.GetComponentInChildren<TextMeshProUGUI>();
-            if (textComponent != null)
+            PlayerListItem itemScript = listItem.GetComponent<PlayerListItem>();
+            if (itemScript != null)
             {
-                string displayName = (AuthenticationService.Instance.IsSignedIn && player.Id == AuthenticationService.Instance.PlayerId) ? "You" : "Opponent";
-                textComponent.text = $"{displayName} ({player.Id.Substring(0, 5)}...)";
+                bool isLocal = AuthenticationService.Instance.IsSignedIn && player.Id == AuthenticationService.Instance.PlayerId;
+                string displayName = isLocal ? "You" : "Opponent";
+                bool isHost = player.Id == session.Host;
+                string symbol = isHost ? "X" : "O";
+                
+                itemScript.Setup($"{displayName} ({player.Id.Substring(0, 5)}...)", symbol);
             }
         }
     }

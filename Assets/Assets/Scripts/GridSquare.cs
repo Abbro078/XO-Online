@@ -7,6 +7,7 @@ public class GridSquare : MonoBehaviour
     [SerializeField] private int x;
     [SerializeField] private int y;
     
+    [SerializeField] private GameObject markImageContainer;
     [SerializeField] private TextMeshProUGUI markText;
     private Button button;
 
@@ -42,19 +43,68 @@ public class GridSquare : MonoBehaviour
 
     public void UpdateVisual(PlayerType player)
     {
-        if (markText == null) return;
-
-        switch (player)
+        if (player == PlayerType.None)
         {
-            case PlayerType.None:
-                markText.text = "";
-                break;
-            case PlayerType.X:
-                markText.text = "X";
-                break;
-            case PlayerType.O:
-                markText.text = "O";
-                break;
+            if (markImageContainer != null) markImageContainer.SetActive(false);
+            if (markText != null) markText.text = "";
+            return;
         }
+
+        // Activate the container
+        if (markImageContainer != null) markImageContainer.SetActive(true);
+
+        // Set the text
+        if (markText != null)
+        {
+            markText.text = player == PlayerType.X ? "X" : "O";
+        }
+
+        // Apply juicy random rotation and falling animation
+        if (markImageContainer != null)
+        {
+            float randomZ = Random.Range(-5f, 5f);
+            markImageContainer.transform.localRotation = Quaternion.Euler(0, 0, randomZ);
+
+            StopAllCoroutines();
+            StartCoroutine(FallAnimationCoroutine());
+        }
+    }
+
+    private System.Collections.IEnumerator FallAnimationCoroutine()
+    {
+        RectTransform rt = markImageContainer.GetComponent<RectTransform>();
+        if (rt == null) yield break;
+
+        float duration = 0.35f; // slightly longer for the bounce to play out
+        float elapsed = 0f;
+
+        // Random end position to give it a messy, naturally placed feel
+        Vector2 endPos = new Vector2(Random.Range(-8f, 8f), Random.Range(-8f, 8f));
+        // Start 150 units above the end position
+        Vector2 startPos = endPos + new Vector2(0, 150f);
+
+        // Make it scale up slightly as it falls
+        Vector3 startScale = new Vector3(1.3f, 1.3f, 1f);
+        Vector3 endScale = Vector3.one;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / duration;
+            
+            // Back Ease Out formula: Overshoots the target and bounces back
+            float s = 2.5f; // Bounciness factor
+            float p = t - 1f;
+            float easeT = (p * p * ((s + 1f) * p + s) + 1f);
+            
+            // We use LerpUnclamped because easeT will go slightly above 1.0 during the bounce
+            rt.anchoredPosition = Vector2.LerpUnclamped(startPos, endPos, easeT);
+            rt.localScale = Vector3.LerpUnclamped(startScale, endScale, easeT);
+            
+            yield return null;
+        }
+
+        rt.anchoredPosition = endPos;
+        rt.localScale = endScale;
     }
 }

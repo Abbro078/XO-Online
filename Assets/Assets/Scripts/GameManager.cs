@@ -20,8 +20,10 @@ public class GameManager : NetworkBehaviour
     [Header("Game Over UI")]
     [SerializeField] private GameObject gameOverPanel;
     [SerializeField] private Button playAgainButton;
+    [SerializeField] private GameObject waitingForOpponentPanel;
     [SerializeField] private TextMeshProUGUI waitingForOpponentText;
     [SerializeField] private Button returnToMenuButton;
+    [SerializeField] private WinLineAnimator winLineAnimator;
     
     [Header("Scene Settings")]
     [SerializeField] private string mainMenuScene = "Main Menu Scene";
@@ -35,6 +37,8 @@ public class GameManager : NetworkBehaviour
 
     private int playersReadyToPlayAgain = 0;
     private bool hostIsX = true;
+
+    private Coroutine gameOverCoroutine;
 
     private GridSquare[,] gridSquares = new GridSquare[3, 3];
 
@@ -75,7 +79,14 @@ public class GameManager : NetworkBehaviour
     private void OnClientDisconnect(ulong clientId)
     {
         isGameOver = true;
+        
+        if (gameOverCoroutine != null)
+        {
+            StopCoroutine(gameOverCoroutine);
+            gameOverCoroutine = null;
+        }
 
+        // Show the game over panel with player left messaging
         if (gameOverPanel != null) gameOverPanel.SetActive(true);
         if (winnerText != null) winnerText.text = "Opponent Left!";
         
@@ -85,6 +96,11 @@ public class GameManager : NetworkBehaviour
             playAgainButton.interactable = false;
         }
 
+        if (waitingForOpponentPanel != null)
+        {
+            waitingForOpponentPanel.SetActive(true);
+        }
+        
         if (waitingForOpponentText != null)
         {
             waitingForOpponentText.gameObject.SetActive(true);
@@ -133,7 +149,7 @@ public class GameManager : NetworkBehaviour
 
             UpdateBoardClientRpc(x, y, currentTurn);
 
-            CheckWinCondition();
+            CheckWinCondition(x, y);
 
             if (!isGameOver)
             {
@@ -162,16 +178,16 @@ public class GameManager : NetworkBehaviour
             
             if (localPlayer == currentTurn)
             {
-                turnText.text = $"<color=#00FF00>Your Turn ({currentTurn})</color>";
+                turnText.text = $"{currentTurn}'s Turn <color=#008965><b>(Yours)</color>";
             }
             else
             {
-                turnText.text = $"<color=#FF0000>Opponent's Turn ({currentTurn})</color>";
+                turnText.text = $"{currentTurn}'s Turn <color=#B21F3B><b>(Theirs)</color>";
             }
         }
     }
 
-    private void CheckWinCondition()
+    private void CheckWinCondition(int lastX, int lastY)
     {
         if (!IsServer) return;
 
@@ -179,46 +195,65 @@ public class GameManager : NetworkBehaviour
         {
             if (boardState[i, 0] != PlayerType.None && boardState[i, 0] == boardState[i, 1] && boardState[i, 1] == boardState[i, 2])
             {
-                EndGameClientRpc(boardState[i, 0], hostIsX);
+                EndGameClientRpc(boardState[i, 0], hostIsX, i, lastX, lastY); // i is the Row
                 return;
             }
             
             if (boardState[0, i] != PlayerType.None && boardState[0, i] == boardState[1, i] && boardState[1, i] == boardState[2, i])
             {
-                EndGameClientRpc(boardState[0, i], hostIsX);
+                EndGameClientRpc(boardState[0, i], hostIsX, i + 3, lastX, lastY); // i+3 is the Col
                 return;
             }
         }
 
         if (boardState[0, 0] != PlayerType.None && boardState[0, 0] == boardState[1, 1] && boardState[1, 1] == boardState[2, 2])
         {
-            EndGameClientRpc(boardState[0, 0], hostIsX);
+            EndGameClientRpc(boardState[0, 0], hostIsX, 6, lastX, lastY); // 6 is Diag1
             return;
         }
 
         if (boardState[0, 2] != PlayerType.None && boardState[0, 2] == boardState[1, 1] && boardState[1, 1] == boardState[2, 0])
         {
-            EndGameClientRpc(boardState[0, 2], hostIsX);
+            EndGameClientRpc(boardState[0, 2], hostIsX, 7, lastX, lastY); // 7 is Diag2
             return;
         }
 
         if (movesMade >= 9)
         {
-            EndGameClientRpc(PlayerType.None, hostIsX);
+            EndGameClientRpc(PlayerType.None, hostIsX, -1, lastX, lastY); // -1 signifies no winning line (Draw)
         }
     }
 
     [ClientRpc]
-    private void EndGameClientRpc(PlayerType winner, bool currentHostIsX)
+    private void EndGameClientRpc(PlayerType winner, bool currentHostIsX, int winningLineIndex, int winX, int winY)
     {
-        isGameOver = true;
+        isGameOver = true; // Lock the board immediately
         
+        if (gameOverCoroutine != null) StopCoroutine(gameOverCoroutine);
+        gameOverCoroutine = StartCoroutine(ShowGameOverDelayed(winner, currentHostIsX, winningLineIndex, winX, winY));
+    }
+
+    private System.Collections.IEnumerator ShowGameOverDelayed(PlayerType winner, bool currentHostIsX, int lineIndex, int winX, int winY)
+    {
+        // 1. Wait for the piece falling animation to complete
+        yield return new WaitForSeconds(0.35f); 
+
+        // 2. Play the winning line animation
+        if (winner != PlayerType.None && winLineAnimator != null)
+        {
+            yield return StartCoroutine(winLineAnimator.AnimateWinLine(lineIndex, winX, winY));
+        }
+
+        // 3. Wait a little bit to soak in the win
+        yield return new WaitForSeconds(0.5f);
+
         if (gameOverPanel != null) gameOverPanel.SetActive(true);
         if (playAgainButton != null) 
         {
             playAgainButton.gameObject.SetActive(true);
             playAgainButton.interactable = true;
         }
+        if (waitingForOpponentPanel !=null) waitingForOpponentPanel.SetActive(false);
         if (waitingForOpponentText != null) waitingForOpponentText.gameObject.SetActive(false);
 
         if (winnerText != null)
@@ -229,15 +264,7 @@ public class GameManager : NetworkBehaviour
             }
             else
             {
-                PlayerType localPlayer = (IsServer == currentHostIsX) ? PlayerType.X : PlayerType.O;
-                if (winner == localPlayer)
-                {
-                    winnerText.text = "You Win!";
-                }
-                else
-                {
-                    winnerText.text = "You Lose!";
-                }
+                winnerText.text = $"Player {winner} Wins!";
             }
         }
     }
@@ -245,6 +272,12 @@ public class GameManager : NetworkBehaviour
     public void OnPlayAgainClicked()
     {
         if (playAgainButton != null) playAgainButton.gameObject.SetActive(false);
+
+        if (waitingForOpponentPanel != null)
+        {
+            waitingForOpponentPanel.SetActive(true);
+        }
+        
         if (waitingForOpponentText != null) 
         {
             waitingForOpponentText.gameObject.SetActive(true);
@@ -288,10 +321,16 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     private void ShowOpponentWantsToPlayClientRpc(ClientRpcParams clientRpcParams = default)
     {
+
+        if (waitingForOpponentPanel != null)
+        {
+            waitingForOpponentPanel.SetActive(true);
+        }
+        
         if (waitingForOpponentText != null)
         {
             waitingForOpponentText.gameObject.SetActive(true);
-            waitingForOpponentText.text = "Opponent wants to play again!";
+            waitingForOpponentText.text = "Opponent wants a rematch!!";
         }
     }
 
@@ -322,6 +361,14 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     private void ResetGameClientRpc(bool currentHostIsX)
     {
+        if (gameOverCoroutine != null)
+        {
+            StopCoroutine(gameOverCoroutine);
+            gameOverCoroutine = null;
+        }
+
+        if (winLineAnimator != null) winLineAnimator.ResetLines();
+
         isGameOver = false;
         currentTurn = PlayerType.X;
         UpdateTurnClientRpc(currentTurn, currentHostIsX);

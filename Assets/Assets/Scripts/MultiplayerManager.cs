@@ -114,7 +114,7 @@ public class MultiplayerManager : MonoBehaviour
         {
             var options = new QuickJoinOptions();
             CurrentSession = await MultiplayerService.Instance.MatchmakeSessionAsync(options, new SessionOptions().WithRelayNetwork());
-            Debug.Log("Quick Joined game!");
+            Debug.Log("Quick Joined an existing game!");
 
             CurrentSession.Deleted += TriggerSessionEnded;
             CurrentSession.PlayerHasLeft += (playerId) => TriggerSessionEnded();
@@ -123,8 +123,30 @@ public class MultiplayerManager : MonoBehaviour
         }
         catch (Exception e)
         {
-            Debug.LogError($"Failed to quick join: {e.Message}");
-            OnError?.Invoke($"Failed to quick join: {e.Message}");
+            Debug.Log($"Quick join didn't find any lobbies, creating a new one instead... ({e.Message})");
+            
+            try
+            {
+                // Fallback: Create a new open lobby
+                var fallbackOptions = new SessionOptions
+                {
+                    MaxPlayers = 2,
+                    IsPrivate = false
+                }.WithRelayNetwork();
+                
+                CurrentSession = await MultiplayerService.Instance.CreateSessionAsync(fallbackOptions);
+                Debug.Log($"Created new Game for Matchmaking! Join Code: {CurrentSession.Code}");
+                
+                CurrentSession.Deleted += TriggerSessionEnded;
+                CurrentSession.PlayerHasLeft += (playerId) => TriggerSessionEnded();
+
+                OnSessionEstablished?.Invoke();
+            }
+            catch (Exception fallbackEx)
+            {
+                Debug.LogError($"Failed to quick join or create lobby: {fallbackEx.Message}");
+                OnError?.Invoke($"Failed to quick join or create: {fallbackEx.Message}");
+            }
         }
     }
 
