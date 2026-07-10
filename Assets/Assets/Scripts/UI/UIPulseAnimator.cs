@@ -17,17 +17,13 @@ public class UIPulseAnimator : MonoBehaviour
 
     void Awake()
     {
-        // Grab the CanvasGroup attached to this GameObject
         canvasGroup = GetComponent<CanvasGroup>();
     }
 
     void Update()
     {
-        // 1. Generate a Sine wave that naturally goes up and down over time
-        // Mathf.Sin naturally goes from -1 to 1. We +1 and /2 to make it go from 0 to 1.
         float wave = (Mathf.Sin(Time.time * pulseSpeed) + 1f) / 2f;
 
-        // 2. Smoothly blend between your minimum and maximum alpha based on the wave
         canvasGroup.alpha = Mathf.Lerp(minAlpha, maxAlpha, wave);
     }
 }

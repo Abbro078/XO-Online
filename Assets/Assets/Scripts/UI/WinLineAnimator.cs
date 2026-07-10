@@ -49,32 +49,27 @@ public class WinLineAnimator : MonoBehaviour
         line.gameObject.SetActive(true);
         line.fillAmount = 0;
 
-        // Apply random rotation (+-5 degrees) on top of its initial rotation
         float randZ = Random.Range(-5f, 5f);
         Vector3 rot = line.transform.localEulerAngles;
         line.transform.localEulerAngles = new Vector3(rot.x, rot.y, originalRotationsZ[lineIndex] + randZ);
-
-        // Determine Fill Origin based on the winning move to fill away from the piece.
-        // Assuming standard Image Fill settings (0 usually = Bottom/Left, 1 = Top/Right).
-        // If the line fills backwards, simply swap the 0 and 1 values below!
-        if (lineIndex >= 0 && lineIndex <= 2) // Row (Horizontal)
+        
+        if (lineIndex >= 0 && lineIndex <= 2) 
         {
             line.fillOrigin = (winY <= 1) ? 0 : 1; 
         }
-        else if (lineIndex >= 3 && lineIndex <= 5) // Col (Vertical)
+        else if (lineIndex >= 3 && lineIndex <= 5) 
         {
-            line.fillOrigin = (winX <= 1) ? 1 : 0; // Usually Top is 1
+            line.fillOrigin = (winX <= 1) ? 1 : 0; 
         }
-        else if (lineIndex == 6) // Diag1 (\)
+        else if (lineIndex == 6) 
         {
             line.fillOrigin = (winX <= 1) ? 1 : 0;
         }
-        else if (lineIndex == 7) // Diag2 (/)
+        else if (lineIndex == 7) 
         {
             line.fillOrigin = (winX <= 1) ? 0 : 1;
         }
 
-        // Fill Animation
         float duration = 0.3f;
         float elapsed = 0f;
 

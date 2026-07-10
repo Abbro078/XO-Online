@@ -127,7 +127,6 @@ public class MultiplayerManager : MonoBehaviour
             
             try
             {
-                // Fallback: Create a new open lobby
                 var fallbackOptions = new SessionOptions
                 {
                     MaxPlayers = 2,
